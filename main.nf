@@ -7,19 +7,20 @@ include {
     interleave_reads;
     filter_abund_single;
     normalize_by_median;
-    split_paired_reads
+    split_paired_reads;
+    summarize_hist
 } from "./modules/process"
 
 include {
     abundance_dist_single as abundance_dist_input
-} from "./modules/process", addParams(
+} from "./modules/process" addParams(
     histDir: "${params.outdir}/abundance_dist_input",
     publishFastq: false
 )
 
 include {
     abundance_dist_single as abundance_dist_output
-} from "./modules/process", addParams(
+} from "./modules/process" addParams(
     histDir: "${params.outdir}/abundance_dist_output",
     publishFastq: "${params.paired}" != "true"
 )
@@ -109,7 +110,7 @@ Parameters:
             }
             | interleave_reads
 
-        reads_ch = interleave_reads.out.fastq
+        reads_ch = interleave_reads.out
 
     } else { // If the reads are single-end
 
@@ -151,5 +152,10 @@ Parameters:
         split_paired_reads(final_interleaved)
 
     }
+
+    summarize_hist(
+        abundance_dist_input.out.hist.toSortedList(),
+        abundance_dist_output.out.hist.toSortedList()
+    )
 
 }

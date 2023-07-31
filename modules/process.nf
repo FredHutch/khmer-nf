@@ -5,23 +5,30 @@ process normalize_by_median {
     memory params.memory_gb
 
     input:
-        tuple val(name), path(fastq)
+        tuple val(sampleName), path(fastq)
 
     output:
-        tuple val(name), path("${name}.diginorm_output.fastq.gz"), emit: fastq
-        file "${name}.diginorm.report.txt", emit: report
+        tuple val(sampleName), path("${sampleName}.diginorm_output.fastq.gz"), emit: fastq
+        path "${sampleName}.diginorm.report.txt", emit: report
 
     script:
 
     """#!/bin/bash
 set -e
 
+if [[ "${params.paired}" == "true" ]]; then
+    FLAGS="-p"
+else
+    FLAGS=""
+fi
+
 normalize-by-median.py \
-    -p \
+    \$FLAGS \
     -k ${params.k} \
+    -M ${task.memory.toBytes()} \
     --cutoff ${params.median_abund} \
-    -R "${name}.report.txt" \
-    --output "${name}.diginorm_output.fastq.gz" \
+    -R "${sampleName}.diginorm.report.txt" \
+    --output "${sampleName}.diginorm_output.fastq.gz" \
     --gzip \
     "${fastq}"
 """
@@ -33,10 +40,10 @@ process filter_abund_single {
     memory params.memory_gb
     
     input:
-        tuple val(name), path(fastq)
+        tuple val(sampleName), path(fastq)
 
     output:
-        tuple val(name), path("${name}.filtered.fastq.gz")
+        tuple val(sampleName), path("${sampleName}.filtered.fastq.gz")
 
     script:
 
@@ -44,47 +51,47 @@ process filter_abund_single {
 set -e
 
 filter-abund-single.py \
+    "${fastq}" \
     -k ${params.k} \
+    -M ${task.memory.toBytes()} \
     --threads ${task.cpus} \
     --cutoff ${params.min_abund} \
-    --normalize-to ${params.median_abund}
-    --output "${name}.filtered.fastq.gz" \
-    --gzip \
-    "${fastq}"
+    --normalize-to ${params.median_abund} \
+    -o "${sampleName}.filtered.fastq.gz" \
+    --gzip
 """
 }
 
 process interleave_reads {
-    container params.container__khmer
+    container params.container__python
 
     input:
-        tuple val(name), path(R1), path(R2)
+        tuple val(sampleName), path(R1), path(R2)
 
     output:
-        tuple val(name), path("${name}.interleaved.fastq.gz")
+        tuple val(sampleName), path("${sampleName}.interleaved.fastq.gz")
 
     script:
 
     """#!/bin/bash
 set -e
 
-interleave-reads.py \
-    -o ${name}.interleaved.fastq.gz \
-    --gzip \
+interleave_fastq.py \
     "${R1}" \
-    "${R2}"
+    "${R2}" \
+    ${sampleName}.interleaved.fastq.gz
 """
 }
 
 process split_paired_reads {
     container params.container__khmer
-    publishDir "${params.outdir}"
+    publishDir "${params.outdir}", mode: 'copy', overwrite: true
 
     input:
-        tuple val(name), path(fastq)
+        tuple val(sampleName), path(fastq)
 
     output:
-        tuple val(name), path("${name}.R1.fastq.gz"), path("${name}.R2.fastq.gz"), path("${name}.orphaned.fastq.gz")
+        tuple val(sampleName), path("${sampleName}.R1.fastq.gz"), path("${sampleName}.R2.fastq.gz"), path("${sampleName}.orphaned.fastq.gz")
 
     script:
 
@@ -92,9 +99,9 @@ process split_paired_reads {
 set -e
 
 split-paired-reads.py \
-    -0 "${name}.orphaned.fastq.gz" \
-    -1 "${name}.R1.fastq.gz" \
-    -2 "${name}.R2.fastq.gz" \
+    -0 "${sampleName}.orphaned.fastq.gz" \
+    -1 "${sampleName}.R1.fastq.gz" \
+    -2 "${sampleName}.R2.fastq.gz" \
     --gzip \
     "${fastq}"
 """
@@ -103,28 +110,46 @@ split-paired-reads.py \
 process abundance_dist_single {
     container params.container__khmer
     publishDir "${params.histDir}", pattern: "*.hist", mode: 'copy', overwrite: true
-    publishDir "${params.outdir}", pattern: "*.fastq.gz", mode: 'copy', overwrite: true, enabled: params.publishFastq, saveAs: "${name}${params.suffix}"
+    publishDir "${params.outdir}", pattern: "*.fastq.gz", mode: 'copy', overwrite: true, enabled: params.publishFastq, saveAs: { "${sampleName}${params.suffix}" }
 
     cpus params.cpus
     memory params.memory_gb
 
     input:
-        tuple val(name), path(fastq)
+        tuple val(sampleName), path(fastq)
 
     output:
-        tuple val(name), path("${name}.hist")
-        path "${fastq}"
+        path "${sampleName}.hist", emit: hist
+        path "*.fastq.gz", includeInputs: true, emit: fastq
 
     script:
 
     """#!/bin/bash
 set -e
 
+rm -f "${sampleName}.hist"
 abundance-dist-single.py \
     -k ${params.k} \
     -T ${task.cpus} \
+    -M ${task.memory.toBytes()} \
     -b \
     "${fastq}" \
-    "${name}.hist"
+    "${sampleName}.hist"
 """
+}
+
+process summarize_hist {
+    container "${params.container__python_plotting}"
+    publishDir "${params.outdir}", mode: 'copy', overwrite: true
+
+    input:
+        path "abundance_dist_input/"
+        path "abundance_dist_output/"
+
+    output:
+        path "*.pdf"
+
+    """
+compare_hist.py
+    """
 }
