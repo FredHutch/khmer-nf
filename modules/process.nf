@@ -85,7 +85,7 @@ interleave_fastq.py \
 
 process split_paired_reads {
     container params.container__khmer
-    publishDir "${params.outdir}", mode: 'copy', overwrite: true
+    publishDir "${params.outdir}/reads", mode: 'copy', overwrite: true
 
     input:
         tuple val(sampleName), path(fastq)
@@ -112,7 +112,7 @@ fi
 process abundance_dist_single {
     container params.container__khmer
     publishDir "${params.histDir}", pattern: "*.hist", mode: 'copy', overwrite: true
-    publishDir "${params.outdir}", pattern: "*.fastq.gz", mode: 'copy', overwrite: true, enabled: params.publishFastq, saveAs: { "${sampleName}${params.suffix}" }
+    publishDir "${params.outdir}/reads", pattern: "*.fastq.gz", mode: 'copy', overwrite: true, enabled: params.publishFastq, saveAs: { "${sampleName}${params.suffix}" }
 
     cpus params.cpus
     memory "${params.memory_gb}.GB"
@@ -145,7 +145,7 @@ fi
 
 process summarize_hist {
     container "${params.container__python_plotting}"
-    publishDir "${params.outdir}", mode: 'copy', overwrite: true
+    publishDir "${params.outdir}/summary", mode: 'copy', overwrite: true
 
     input:
         path "abundance_dist_input/"
