@@ -2,7 +2,7 @@ process normalize_by_median {
     container params.container__khmer
     publishDir "${params.outdir}/report", mode: 'copy', overwrite: true, pattern: "*.diginorm.report.txt"
     cpus params.cpus
-    memory params.memory_gb
+    memory "${params.memory_gb}.GB"
 
     input:
         tuple val(sampleName), path(fastq)
@@ -37,7 +37,7 @@ normalize-by-median.py \
 process filter_abund_single {
     container params.container__khmer
     cpus params.cpus
-    memory params.memory_gb
+    memory "${params.memory_gb}.GB"
     
     input:
         tuple val(sampleName), path(fastq)
@@ -113,7 +113,7 @@ process abundance_dist_single {
     publishDir "${params.outdir}", pattern: "*.fastq.gz", mode: 'copy', overwrite: true, enabled: params.publishFastq, saveAs: { "${sampleName}${params.suffix}" }
 
     cpus params.cpus
-    memory params.memory_gb
+    memory "${params.memory_gb}.GB"
 
     input:
         tuple val(sampleName), path(fastq)

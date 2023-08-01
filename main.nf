@@ -89,7 +89,7 @@ Parameters:
 
     Resources:
         cpus = ${params.cpus}
-        memory_gb = ${params.memory_gb}
+        memory_gb = ${params.memory_gb}.GB
         container__khmer = ${params.container__khmer}
 
 """
