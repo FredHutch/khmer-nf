@@ -91,19 +91,21 @@ process split_paired_reads {
         tuple val(sampleName), path(fastq)
 
     output:
-        tuple val(sampleName), path("${sampleName}.R1.fastq.gz"), path("${sampleName}.R2.fastq.gz"), path("${sampleName}.orphaned.fastq.gz")
+        tuple val(sampleName), path("${sampleName}.R1.fastq.gz"), path("${sampleName}.R2.fastq.gz"), path("${sampleName}.orphaned.fastq.gz"), optional: true
 
     script:
 
     """#!/bin/bash
 set -e
 
-split-paired-reads.py \
-    -0 "${sampleName}.orphaned.fastq.gz" \
-    -1 "${sampleName}.R1.fastq.gz" \
-    -2 "${sampleName}.R2.fastq.gz" \
-    --gzip \
-    "${fastq}"
+if (( \$(gunzip -c "${fastq}" | head | wc -l) > 0 )); then
+    split-paired-reads.py \
+        -0 "${sampleName}.orphaned.fastq.gz" \
+        -1 "${sampleName}.R1.fastq.gz" \
+        -2 "${sampleName}.R2.fastq.gz" \
+        --gzip \
+        "${fastq}"
+fi
 """
 }
 
@@ -119,7 +121,7 @@ process abundance_dist_single {
         tuple val(sampleName), path(fastq)
 
     output:
-        path "${sampleName}.hist", emit: hist
+        path "${sampleName}.hist", emit: hist, optional: true
         path "*.fastq.gz", includeInputs: true, emit: fastq
 
     script:
@@ -128,13 +130,16 @@ process abundance_dist_single {
 set -e
 
 rm -f "${sampleName}.hist"
-abundance-dist-single.py \
-    -k ${params.k} \
-    -T ${task.cpus} \
-    -M ${task.memory.toBytes()} \
-    -b \
-    "${fastq}" \
-    "${sampleName}.hist"
+
+if (( \$(gunzip -c "${fastq}" | head | wc -l) > 0 )); then
+    abundance-dist-single.py \
+        -k ${params.k} \
+        -T ${task.cpus} \
+        -M ${task.memory.toBytes()} \
+        -b \
+        "${fastq}" \
+        "${sampleName}.hist"
+fi
 """
 }
 
